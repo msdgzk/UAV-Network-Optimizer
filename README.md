@@ -10,12 +10,12 @@ This project simulates a wireless network including ground-aerial nodes where so
 
 - **Probabilistic Line-of-Sight (LoS) Model**: Calculates the probability of line-of-sight connections between ground-aerial nodes based on their positions and environmental parameters.
 - **Channel Fading Models**: Implements both Rayleigh (NLoS) and Rician (LoS) fading models for wireless channels.
-- **Interference Modeling**: Models interference using log-normal approximation of aggregate interference.
+- **Interference Modeling**: Models interference using the log-normal distribution.
 - **Packet Loss Analysis**: Calculates packet loss probability based on:
   - Buffer overflow probability
   - Time threshold probability
   - Transmission error probability
-- **PSNR Modeling**: Calculates video quality metric based on packet loss distortion and compression distortion.
+- **PSNR Modeling**: Calculates PSNR based on packet loss distortion and compression distortion.
 - **Throughput Modeling**: Calculates throughput based on overall packet loss.
 - **UAV Position Adjustment**: Functions to adjust UAV positions based on distance or elevation angle.
 - **Optimization Algorithms**:
