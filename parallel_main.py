@@ -31,6 +31,8 @@ zDelta = zMax - zMin
 areaTotal = xDelta * yDelta * zDelta
 lambda0 = 0.001 #Newtork density
 size = np.random.poisson(lambda0 * areaTotal) #Number of nodes
+if size % 2 == 1: #Even number of nodes
+    size += 1
 x = xDelta * np.random.uniform(0, 1, size) + xMin
 y = yDelta * np.random.uniform(0, 1, size) + yMin
 z = zDelta * np.random.uniform(0, 1, size - 2) + zMin
@@ -40,7 +42,7 @@ Ln = [3.04 for i in range(size)] #Average video packet length
 Beta = [2 for i in range(size)] #Channel fading threshold
 Lambdan = [100 for i in range(size)] #Incoming packet rate
 Pt = [0.2 for i in range(size)] #Transmit power
-mp = [i for i in range(size)] #All nodes' indices
+mp = [size - i - 1 for i in range(size)] #All nodes' indices
 
 
 def PLoS(s, n, zet=20, v=3 * 1e-4, mi=0.5): #Line of sight probability
