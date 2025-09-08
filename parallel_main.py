@@ -87,7 +87,7 @@ def Pov(s, n): #Buffer overflow probability
             1 - rho(s, n) * np.exp(-normalizedBuffer * (1 - rho(s, n))))
 
 
-def hn(s, n): # Path loss model
+def hn(s, n): #Path loss model
     return (c / (4 * np.pi * f)) * np.sqrt(
         (d0 ** ((-1.5 * PLoS(s, n) + 3.5) - 2)) / ((math.dist((x[s], y[s], z[s]), (x[n], y[n], z[n]))) ** (-1.5 * PLoS(s, n) + 3.5)))
 
