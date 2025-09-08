@@ -166,9 +166,9 @@ def BetaUpRician(s, n, betan):
         return 0
 
 
-def BetamUpRician(s):
+def BetamUpRician(s, n):
     ini_betam = 2
-    while BetaUpRician(s, size - (s + 1), ini_betam) != 0:
+    while BetaUpRician(s, n, ini_betam) != 0:
         ini_betam += 0.01
     return ini_betam
 
