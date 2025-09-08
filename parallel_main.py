@@ -158,7 +158,7 @@ def Perr(m, s, n):
 
 
 def BetaUpRayleigh(s):
-    return np.sqrt(- Omega * np.log(1 - (1 - Tslt * Lambdan[s]) ** (1 / F)))
+    return math.sqrt(- Omega * math.log(1 - (1 - Tslt * Lambdan[s]) ** (1 / F)))
 
 
 def BetaUpRician(s, n, betan):
