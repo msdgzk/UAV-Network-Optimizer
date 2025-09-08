@@ -18,7 +18,6 @@ T = 290 #Temperature
 BW = 1e8 #Bandwidth
 sen = 30 #Sensitivity
 normalizedBuffer = 50 #Normalized buffer size
-Pt = 0.2 #Transmit power
 GaNoise = k * T * BW #Noise power
 xMin = -50
 xMax = 50
@@ -40,15 +39,17 @@ z = np.insert(z, 0, 50) #Streamer UAV altitude
 Ln = [3.04 for i in range(size)] #Average video packet length
 Beta = [2 for i in range(size)] #Channel fading threshold
 Lambdan = [100 for i in range(size)] #Incoming packet rate
-mp = [i for i in range(int(size/2))] #Streamer nodes' indices
+Pt = [0.2 for i in range(size)] #Transmit power
+mp = [i for i in range(size)] #All nodes' indices
 
 
 def PLoS(s, n, zet=20, v=3 * 1e-4, mi=0.5): #Line of sight probability
     if z[s] == z[n]:
+        print("Same Height")
         return (1 - np.exp(-(z[s] ** 2) / (2 * (zet ** 2)))) ** (
                 math.dist((x[s], y[s], z[s]), (x[n], y[n], z[n])) * np.sqrt(v * mi))
     else:
-        return (1 - (((np.sqrt(2 * np.pi) * zet) / math.dist((0, 0, z[s]), (0, 0, z[n]))) * abs(
+        return (1 - (((np.sqrt(2 * np.pi) * zet) / math.dist((0, 0, z[s]), (0, 0, z[n]))) * np.abs(
             (1 - norm.cdf(z[s] / zet)) - (1 - norm.cdf(z[n] / zet))))) ** (
                 math.dist((x[s], y[s], 0), (x[n], y[n], 0)) * np.sqrt(v * mi))
 
@@ -99,7 +100,7 @@ def EIfunc(x, RorR, b):
 def EI(m, s, n):
     sum = 0
     for i in range(len(m)):
-        sum += Pt * (hn(m[i], n) ** 2) * (
+        sum += Pt[m[i]] * (hn(m[i], n) ** 2) * (
             (quad(lambda x: EIfunc(x, RorR(m[i], n), b(m[i], n)), Beta[m[i]], 10))[
                 0]) * (Miun(Beta[m[i]], s, n) / F)
     return sum
@@ -117,40 +118,40 @@ def DI(m, s, n):
     sum1 = 0
     for i in range(len(m)):
         j = 0
-        sum += (Pt ** 2) * (hn(m[i], n) ** 4) * (
+        sum += (Pt[m[i]] ** 2) * (hn(m[i], n) ** 4) * (
             (quad(lambda x: DIfunc(x, RorR(m[i], n), b(m[i], n)), Beta[m[i]], 10))[
                 0]) * ((Miun(Beta[m[i]], s, n) / F) ** 2)
         while j < i:
-            sum1 += 2 * Pt * (hn(m[i], n) ** 2) * (
+            sum1 += 2 * Pt[m[i]] * (hn(m[i], n) ** 2) * (
                 (quad(lambda x: EIfunc(x, RorR(m[i], n), b(m[i], n)), Beta[m[i]], 10))[
                     0]) * (
-                            Miun(Beta[m[j]], s, n) / F) * Pt * (hn(m[j], n) ** 2) * (
+                            Miun(Beta[m[j]], s, n) / F) * Pt[m[j]] * (hn(m[j], n) ** 2) * (
                         (quad(lambda x: EIfunc(x, RorR(m[j], n), b(m[j], n)), Beta[m[j]], 10))[0]) * (
                             Miun(Beta[m[j]], s, n) / F)
             j += 1
     return sum + sum1 - (EI(m, s, n) ** 2)
 
 
-def locmu(m, s, n): #Interference log-normal model parameters
+def locmu(m, s, n):
     return np.log(EI(m, s, n)) - np.log(1 + (DI(m, s, n) / (EI(m, s, n) ** 2))) / 2
 
 
-def sclsigma(m, s, n): #Interference log-normal model parameters
+def sclsigma(m, s, n):
     return np.sqrt(np.log(1 + (DI(m, s, n) / (EI(m, s, n) ** 2))))
 
 
-def Perrfunc(x, m, s, n): 
+def Perrfunc(x, m, s, n):
     if RorR(s, n) == 0:
         return rayleigh.pdf(x) * (0.5 - (0.5 * math.erf((np.log(
-            (Pt * (hn(s, n) ** 2) * (x ** 2) / SINRTh) - (GaNoise)) - locmu(m, s, n)) / (
+            (Pt[s] * (hn(s, n) ** 2) * (x ** 2) / SINRTh) - GaNoise) - locmu(m, s, n)) / (
                                                                 np.sqrt(2) * sclsigma(m, s, n)))))
     else:
         return rice.pdf(x, b(s, n)) * (0.5 - (0.5 * math.erf((np.log(
-            (Pt * (hn(s, n) ** 2) * (x ** 2) / SINRTh) - (GaNoise)) - locmu(m, s, n)) / (
+            (Pt[s] * (hn(s, n) ** 2) * (x ** 2) / SINRTh) - GaNoise) - locmu(m, s, n)) / (
                                                                      np.sqrt(2) * sclsigma(m, s, n)))))
 
 
-def Perr(m, s, n): #Transmission error probability
+def Perr(m, s, n):
     return quad(lambda x: Perrfunc(x, m, s, n), Beta[s], 10)[0]
 
 
@@ -307,28 +308,23 @@ def parallel_DVTC(j, mp, n):
     return mp[j], beta_star_j, rn_bst_j
 
 
-def DVTC(mp, n, itr=100): #Channel fading threshold optimizer
+def DVTC(mp, itr=100): #Channel fading threshold optimizer
     global Beta
-    betan_star = [BetamUpRician(mp[i], n) - 0.01 if RorR(mp[i], n) == 1 else BetaUpRayleigh(mp[i]) - 0.01 for i in
-                  range(size)]
-    Beta = betan_star.copy()
-    rn_bst = betan_star.copy()
-    print('Maximum Beta:', Beta)
+    prv_Betan = Beta.copy()
+    rn_bst = Lambdan.copy()
     for i in range(itr):
-        prv_Betan = betan_star.copy()
-        Beta = prv_Betan.copy()
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            futures = [executor.submit(parallel_DVTC, j, mp, n) for j in range(len(mp))]
+            futures = [executor.submit(parallel_DVTC, j, mp, size - (mp[j] + 1)) for j in range(len(mp))]
             for future in concurrent.futures.as_completed(futures):
                 idx, beta_star_j, rn_bst_j = future.result()
-                betan_star[idx] = beta_star_j
+                prv_Betan[idx] = beta_star_j
                 rn_bst[idx] = rn_bst_j
-        print("Optimal Beta:", betan_star)
+        print("Optimal Beta:", prv_Betan)
         print("Optimal PSNR:", rn_bst)
-        print("Number of Iterations:", i + 1)
-        if betan_star == prv_Betan:
+        if prv_Betan == Beta:
             break
-    return betan_star
+        Beta = prv_Betan.copy()
+    return Beta
 
 
 def ELCS(bst_lambdan, bst_psnr, j, m, n, stpdiv=0.5, stpini=1, stpth=1): #Encoder local coordinate search
@@ -358,7 +354,7 @@ def ELCS(bst_lambdan, bst_psnr, j, m, n, stpdiv=0.5, stpini=1, stpth=1): #Encode
             if stp < stpth:
                 flag = 4
                 break
-            Lambdan[mp[j] + 1] = bst_lambdan + stp
+            Lambdan[mp[j]] = bst_lambdan + stp
             psnr_can = PSNR(m, mp[j], n)
             if psnr_can > bst_psnr:
                 bst_psnr = psnr_can
@@ -414,43 +410,38 @@ def parallel_DVEC(j, mp, n):
     return mp[j], lambda_star_j, psnr_bst_j
 
 
-def DVEC(mp, n, itr=100):  # Video encoding rate optimizer
-    global Lambdan, psnr_bst
-    lambda_star = Lambdan.copy()
-    psnr_cur = psnr_bst.copy()
-    for i in range(itr):
-        prv_lambda = lambda_star.copy()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            futures = [executor.submit(parallel_DVEC, j, mp, n) for j in range(len(mp))]
-            for future in concurrent.futures.as_completed(futures):
-                idx, lambda_star_j, psnr_bst_j = future.result()
-                lambda_star[idx] = lambda_star_j
-                psnr_cur[idx] = psnr_bst_j
-        print("Optimal Lambda:", lambda_star)
-        print("Optimal PSNR:", psnr_cur)
-        print("Number of Iterations:", i + 1)
-        if lambda_star == prv_lambda:
-            break
-        Lambdan = lambda_star.copy()
-        psnr_bst = psnr_cur.copy()
-    return lambda_star
-
+def DVEC(mp):  # Video encoding rate optimizer
+    global Lambdan
+    prv_lambda = Lambdan.copy()
+    psnr_bst = Lambdan.copy()
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = [executor.submit(parallel_DVEC, j, mp, size - (mp[j] + 1)) for j in range(int(len(mp)/2))]
+        for future in concurrent.futures.as_completed(futures):
+            idx, lambda_star_j, psnr_bst_j = future.result()
+            prv_lambda[idx] = lambda_star_j
+            psnr_bst[idx] = psnr_bst_j
+    print("Optimal Lambda:", prv_lambda)
+    print("Optimal PSNR:", psnr_bst)
+    Lambdan = prv_lambda.copy()
+    return Lambdan
+    
 
 def JDVT_EC(mp, itr=100): #Joint channel fading threshold and video encoding rate optimizer
-    global Beta, Lambdan, psnr_bst
-    psnr_bst = Lambdan.copy()
+    global Beta, Lambdan
+    betan_star = [BetamUpRician(mp[i], size - (mp[i] + 1)) - 0.01 if RorR(mp[i], size - (mp[i] + 1)) == 1 else BetaUpRayleigh(mp[i]) - 0.01 for i in
+                  range(size)]
+    Beta = betan_star.copy()
     for i in range(itr):
-        if i == 0:
-            stpdiv = 0.5
-        else:
-            stpdiv = 1
         print('Counter:', i + 1)
         beta_prv = Beta.copy()
         lambda_prv = Lambdan.copy()
         print('Current Beta:', Beta)
         print('Current Lambda:', Lambdan)
-        Beta = DVTC(mp, stpdiv).copy()
-        Lambdan = DVEC(mp, stpdiv).copy()
+        Beta = DVTC(mp).copy()
+        Lambdan = DVEC(mp).copy()
         if Beta == beta_prv and Lambdan == lambda_prv:
             break
     return Beta, Lambdan
+
+
+print(JDVT_EC(mp))
